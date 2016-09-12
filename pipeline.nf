@@ -40,7 +40,7 @@ process faidx {
 	file genome
 	
 	output:
-	file "${genome}.fai" into (fastaIndex, fastaIndex0)
+	file "${genome}.fai" into (fastaIndex, fastaIndex0, fastaIndex1)
 	
 	script:
 	"""
@@ -58,12 +58,18 @@ process indexHairpin {
 	
 	output:
 	file "genomeDir" into hairpinIndex
+	file "hairpins.gtf" into (hairpinsGtf1, hairpinsGtf2)
 	
 	script:
 	"""
 	mkdir genomeDir
 
-	cat ${annotation} | awk '\$3==\"gene\"' | grep "gene_type \\\"miRNA\\\"" | fastaFromBed -fi ${genome} -bed stdin -name -s -fo hairpin.fa
+	cat ${annotation} | awk '\$3==\"gene\"' | grep "gene_type \\\"miRNA\\\"" > hairpins.gtf
+
+	cat hairpins.gtf | awk 'BEGIN{OFS=FS=\"\t\"}{n=split(\$9,a,\"; \"); \
+	for(i=1;i<=n;i++){split(a[i],b,\" \"); gsub(/\"/, \"\", b[2]); \
+	if(b[1]==\"gene_id\"){gn=b[2]}} print \$1, \$4, \$5, gn, 0, \$7}' \
+	| fastaFromBed -fi ${genome} -bed stdin -name -s -fo hairpin.fa
 
 	samtools faidx hairpin.fa
 
@@ -105,7 +111,7 @@ process cutadapt {
     set expId, file(fastq), adapter from fastqs
 
 	output:
-	set expId, file('trim.fastq.gz') into trimmedFastq
+	set expId, file('trim.fastq.gz') into (trimmedFastq1, trimmedFastq2)
 	
 	script:
 
@@ -118,7 +124,6 @@ process cutadapt {
 	"""
 }
 
-(trimmedFastq1, trimmedFastq2) = trimmedFastq.into(2)
 
 process map2genome {
 
@@ -127,7 +132,7 @@ process map2genome {
 	set expId, file(fastqTrim) from trimmedFastq1
 
 	output:
-	set expId, file('Aligned.sortedByCoord.out.bam') into bamGenome
+	set expId, file('Aligned.sortedByCoord.out.bam') into (bamGenome1, bamGenome2)
 
 	script:
 	"""
@@ -151,7 +156,6 @@ process map2genome {
 	"""
 }
 
-(bamGenome1, bamGenome2) = bamGenome.into(2)
 
 process bamGenome2bw {
 
@@ -217,13 +221,33 @@ process map2hairpins {
 }
 
 
-//process hairpins2genome {
-//	
-//	input:
-//	set expId, file(bam) from bamHairpin
-//}
+process hairpins2genome {
+	
+	input:
+	set expId, file(bam) from bamHairpin
+	file gtf from hairpinsGtf1.first()
+	file fai from fastaIndex1.first()
 
+	output:
+	set expId, file("${expId}.gCoord.bam") into bamHairpinGenome
 
+	script:
+	"""
+	hairpin2genome.sh ${gtf} ${bam} ${fai} ${expId}.gCoord
+	"""
+}
+
+process hairpins2counts {
+
+	input:
+	set expId, file(bam) from bamHairpinGenome
+	file gtf from hairpinsGtf2.first()
+
+	script:
+	"""
+	count.reads.elements.py --abam ${bam} -b ${gtf} -o ${expId}.reads.tsv
+	"""
+}
 
 workflow.onComplete {
     println "Pipeline completed at : $workflow.complete"
