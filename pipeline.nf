@@ -105,7 +105,7 @@ process projExons {
 
 process cutadapt {
 
-	time { fastq.size() > 20_000_000_000 ? 12.h : 6.h }
+	time { file(fastq).size() > 20_000_000_000 ? 12.h : 6.h }
 
 	input:
     set expId, file(fastq), adapter from fastqs
@@ -117,9 +117,9 @@ process cutadapt {
 
 	"""
 	if [ ${adapter} != 'polyA' ]; then
-		cutadapt -a $adapter --trim-n -o trim.fastq.gz -m 16 --too-short-output too-short.fastq.gz $fastq 
+		cutadapt -a ${adapter} --trim-n -o trim.fastq.gz -m 16 --too-short-output too-short.fastq.gz ${fastq} 
 	else
-		cutadapt -a \"A{10}\" -n 10 -e 0.1 --trim-n -o trim.fastq.gz --too-short-output too-short.fastq.gz $fastq
+		cutadapt -a \"A{10}\" -n 10 -e 0.1 --trim-n -o trim.fastq.gz --too-short-output too-short.fastq.gz ${fastq}
 	fi
 	"""
 }
