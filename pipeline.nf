@@ -119,7 +119,7 @@ process cutadapt {
 	if [ ${adapter} != 'polyA' ]; then
 		cutadapt -a ${adapter} --trim-n -o trim.fastq.gz -m 16 --too-short-output too-short.fastq.gz ${fastq} 
 	else
-		cutadapt -a \"A{10}\" -n 10 -e 0.1 --trim-n -o trim.fastq.gz --too-short-output too-short.fastq.gz ${fastq}
+		cutadapt -a \"A{10}\" -n 10 -e 0.1 -m 16 --trim-n -o trim.fastq.gz --too-short-output too-short.fastq.gz ${fastq}
 	fi
 	"""
 }
@@ -148,7 +148,7 @@ process map2genome {
 		--outFilterMismatchNmax 1 \
 		--alignSJDBoverhangMin 1000 \
 		--alignIntronMax 1 \
-		--runThreadN 16 \
+		--runThreadN ${task.cpus} \
 		--limitBAMsortRAM 30000000000
 	'
 	STAR --genomeDir ${genomeDir} --readFilesIn ${fastqTrim} \$params
@@ -212,7 +212,7 @@ process map2hairpins {
 		--outFilterMismatchNmax 1 \
 		--alignSJDBoverhangMin 1000 \
 		--alignIntronMax 1 \
-		--runThreadN 8 \
+		--runThreadN ${task.cpus} \
 		--limitBAMsortRAM 30000000000
 	'
 	STAR --genomeDir ${genomeDir} --readFilesIn ${fastqTrim} \$params
