@@ -1,6 +1,7 @@
 input = file(params.input)
 genome = file(params.genome)
 annotation = file(params.annotation)
+multimaps = params.multimaps ?: 10
 
 
 // Read input file
@@ -30,7 +31,7 @@ process indexGenome {
 	script:
 	"""
 	mkdir genomeDir
-	STAR --runThreadN 18 --runMode genomeGenerate --genomeDir genomeDir --genomeFastaFiles ${genome}
+	STAR --runThreadN 12 --runMode genomeGenerate --genomeDir genomeDir --genomeFastaFiles ${genome}
 	"""
 }
 
@@ -75,7 +76,7 @@ process indexHairpin {
 
 	Nbases=\$(cat hairpin.fa.fai | awk '{c+=\$2}END{a=((log(c)/log(2))/2 -1); print (a>14?14:a)}')
 
-	STAR --runThreadN 16 --runMode genomeGenerate --genomeSAindexNbases \$Nbases --genomeDir genomeDir --genomeFastaFiles hairpin.fa
+	STAR --runThreadN ${task.cpus} --runMode genomeGenerate --genomeSAindexNbases \$Nbases --genomeDir genomeDir --genomeFastaFiles hairpin.fa
 	"""
 }
 
@@ -136,9 +137,9 @@ process map2genome {
 
 	script:
 	"""
-	params='--readFilesCommand zcat \
+	params="--readFilesCommand zcat \
 		--outReadsUnmapped Fastx \
-		--outFilterMultimapNmax 10 \
+		--outFilterMultimapNmax ${multimaps} \
 		--outFilterMultimapScoreRange 0 \
 		--outSAMunmapped None \
 		--outSAMtype BAM SortedByCoordinate \
@@ -150,7 +151,7 @@ process map2genome {
 		--alignIntronMax 1 \
 		--runThreadN ${task.cpus} \
 		--limitBAMsortRAM 30000000000
-	'
+	"
 	STAR --genomeDir ${genomeDir} --readFilesIn ${fastqTrim} \$params
 	samtools index Aligned.sortedByCoord.out.bam
 	"""
@@ -200,9 +201,9 @@ process map2hairpins {
 
 	script:
 	"""
-	params='--readFilesCommand zcat \
+	params="--readFilesCommand zcat \
 		--outReadsUnmapped Fastx \
-		--outFilterMultimapNmax 10 \
+		--outFilterMultimapNmax ${multimaps} \
 		--outFilterMultimapScoreRange 0 \
 		--outSAMunmapped None \
 		--outSAMtype BAM SortedByCoordinate \
@@ -214,7 +215,7 @@ process map2hairpins {
 		--alignIntronMax 1 \
 		--runThreadN ${task.cpus} \
 		--limitBAMsortRAM 30000000000
-	'
+	"
 	STAR --genomeDir ${genomeDir} --readFilesIn ${fastqTrim} \$params
 	samtools index Aligned.sortedByCoord.out.bam
 	"""
